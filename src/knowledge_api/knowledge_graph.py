@@ -146,28 +146,6 @@ class KnowledgeGraph:
         
         # Return top results (without scores)
         return [node for score, node in scored_nodes[:limit]]
-    
-    def get_by_id(self, node_id: str) -> Optional[KnowledgeNode]:
-        """Get a node by ID"""
-        for node in self.nodes:
-            if node.id == node_id:
-                return node
-        return None
-    
-    def get_by_tags(self, tags: List[str], limit: int = 1) -> List[KnowledgeNode]:
-        """Get nodes by tags"""
-        results = []
-        for node in self.nodes:
-            if any(tag in node.tags for tag in tags):
-                results.append(node)
-                if len(results) >= limit:
-                    break
-        return results
-    
-    def get_recent(self, limit: int = 1) -> List[KnowledgeNode]:
-        """Get recently updated nodes"""
-        sorted_nodes = sorted(self.nodes, key=lambda n: n.updated_at, reverse=True)
-        return sorted_nodes[:limit]
 
 
 # Global knowledge graph instance
@@ -184,14 +162,14 @@ def get_knowledge_graph() -> KnowledgeGraph:
 
 # Test the improved search
 if __name__ == "__main__":
-    print("Testing IMPROVED Knowledge Graph Search\n")
+    print("Testing Knowledge Graph Search\n")
     
     kg = get_knowledge_graph()
     
     # Test different queries
     test_queries = [
-        "payment test",
-        "payment",
+        "Run unit tests for payment service and report the results.",
+        "Lint the payment service codebase.",
         "test",
         "payment validation",
         "pytest",

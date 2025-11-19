@@ -24,3 +24,12 @@ htmlcov/
 .idea/
 .vscode/
 *.sqlite3
+
+
+# Temporary sample data files
+src/knowledge_api/sample_data_temp.py
+src/agents/tools/runtime_execution_tool.py
+
+src/agents/prompts/supervisor_prompt.py
+src/agents/prompts/extraction_prompt.py
+src/agents/agents/supervisor_agent.py

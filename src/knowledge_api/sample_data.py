@@ -1,110 +1,21 @@
 """
-Sample Knowledge Data - ROBUST VERSION
+Sample Knowledge Data
 
 This simulates Riverty's Knowledge Graph.
-It attempts to read real files from disk, but falls back to hardcoded 
-strings to ensure the demo works perfectly regardless of file paths.
+It attempts to provide realistic sample data for testing the Knowledge API.
+It includes knowledge from code repositories and Confluence.
 """
 
 from datetime import datetime, timedelta
 from pathlib import Path
 import os
 
-# --- 1. Helper to read files or provide fallback ---
-def read_demo_file(filename):
-    """
-    Reads file from disk or returns hardcoded fallback content.
-    """
-    # Try to find the file in common locations
-    potential_paths = [
-        Path("src/demo_project") / filename,
-        Path("demo_project") / filename,
-        Path("../src/demo_project") / filename,
-        Path("agents/demo_project") / filename
-    ]
-    
-    for path in potential_paths:
-        try:
-            if path.exists():
-                return path.read_text(encoding='utf-8')
-        except Exception:
-            continue
-            
-    # --- FALLBACKS (Guarantees the Demo Works) ---
-    print(f"⚠️  File {filename} not found on disk. Using FALLBACK content.")
-    
-    if filename == "payment_validator.py":
-        return """from decimal import Decimal
-from typing import Any, Dict, Optional
 
-class ValidationError(Exception):
-    pass
-
-class PaymentValidator:
-    def validate_amount(self, amount: Any) -> bool:
-        if amount is None: raise ValidationError("Amount is required")
-        try: val = float(amount)
-        except: raise ValidationError("Invalid amount format")
-        if val < 0.01: raise ValidationError("Amount must be at least 0.01")
-        if val > 999999.99: raise ValidationError("Amount cannot exceed 1,000,000")
-        return True
-
-    def validate_currency(self, currency: Any) -> bool:
-        if not currency: raise ValidationError("Currency is required")
-        if currency not in ["EUR", "USD", "GBP"]: raise ValidationError("Invalid currency")
-        return True
-
-    def validate_payment_method(self, method: Any) -> bool:
-        if not method: raise ValidationError("Payment method is required")
-        if method not in ["credit_card", "debit_card", "bank_transfer", "sepa"]:
-            raise ValidationError("Invalid payment method")
-        return True
-
-    def validate_payment(self, payment: Dict) -> bool:
-        self.validate_amount(payment.get("amount"))
-        self.validate_currency(payment.get("currency"))
-        self.validate_payment_method(payment.get("payment_method"))
-        return True
-"""
-    elif filename == "test_payment_validator.py":
-        return """import pytest
-import sys
-import os
-
-# Handle imports dynamically for the container environment
-try:
-    from demo_project.payment_validator import PaymentValidator, ValidationError
-except ImportError:
-    try:
-        from src.demo_project.payment_validator import PaymentValidator, ValidationError
-    except ImportError:
-        from payment_validator import PaymentValidator, ValidationError
-
-class TestPaymentValidator:
-    def setup_method(self):
-        self.validator = PaymentValidator()
-    
-    def test_validate_amount_valid_integer(self):
-        assert self.validator.validate_amount(100) == True
-    
-    def test_validate_amount_minimum(self):
-        assert self.validator.validate_amount(0.01) == True
-
-    def test_validate_currency_eur(self):
-        assert self.validator.validate_currency("EUR") == True
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--tb=short"])
-"""
-    return ""
-
-
-# --- 2. Main Data Function ---
 def get_sample_knowledge():
     """
     Get sample knowledge nodes for the simulation.
     """
-    # Import locally to avoid circular dependency issues during init
+
     try:
         from src.knowledge_api.knowledge_graph import KnowledgeNode, SourceType
     except ImportError:
@@ -112,60 +23,75 @@ def get_sample_knowledge():
     
     now = datetime.now()
     
-    # Get content (either from disk or fallback)
-    test_content = read_demo_file("test_payment_validator.py")
-    source_content = read_demo_file("payment_validator.py")
-    
     return [
-        # --- Node 1: Test File ---
+        # --- Node 1: Code Repository ---
         KnowledgeNode(
-            id="payment-service-tests",
-            title="Payment Service Test Suite",
-            content=f"""Test coverage for the Payment Service.
-Running: pytest demo_project/test_payment_validator.py
-""",
-            source_type=SourceType.CODE_REPOSITORY,
-            source_url="github.com/riverty/payment-service/tests/test_payment_validator.py",
-            tags=["testing", "payment", "pytest", "unit-tests", "test"],
-            updated_at=now - timedelta(days=1),
-            metadata={
-                "test_file_path": "demo_project/test_payment_validator.py",
-                "source_file_path": "demo_project/payment_validator.py",
-                "test_command": "pytest demo_project/test_payment_validator.py -v",
-                "dependencies": ["pytest"],
-                # The tool uses this for the initial file
-                "file_content": test_content
-            }
-        ),
-        
-        # --- Node 2: Source Code (The one that was missing content!) ---
-        KnowledgeNode(
-            id="payment-validator-code",
-            # Title MUST match the filename for the tool's search to find it
-            title="payment_validator.py", 
-            content=f"""Payment Validator implementation logic.
-Location: demo_project/payment_validator.py
-""",
-            source_type=SourceType.CODE_REPOSITORY,
-            source_url="github.com/riverty/payment-service/src/payment_validator.py",
-            tags=["code", "payment", "validator", "python"],
-            updated_at=now - timedelta(days=1),
-            metadata={
-                "file_path": "demo_project/payment_validator.py",
-                "language": "python",
-                # CRITICAL FIX: The tool looks for 'full_content' in metadata
-                "full_content": source_content 
-            }
-        ),
-        
-        # --- Node 3: Confluence Doc (Filler) ---
-        KnowledgeNode(
-            id="testing-standards",
-            title="Testing Standards",
-            content="Riverty requires 80% code coverage.",
-            source_type=SourceType.CONFLUENCE,
-            source_url="https://confluence.riverty.com/display/QA",
-            tags=["standards"],
-            updated_at=now - timedelta(days=10)
-        )
-    ]
+        id="payment-validator-code",
+        title="Payment Service: Payment Validator Logic (Python)", 
+        # CONCISE SUMMARY/SNIPPET for quick graph search filtering
+        content="Core Python logic for transaction validation, ensuring amounts are positive and currency is supported (EUR, USD, GBP). Raises ValueError on failure.",
+        source_type=SourceType.CODE_REPOSITORY,
+        source_url="local/simulate/payment-service/src/payment_validator.py", # Local/Azure/GitHub Path
+        tags=["code", "payment", "python", "core-logic", "microservice"],
+        updated_at=now - timedelta(days=2),
+        metadata={
+            "file_path": "src/demo_project/payment_validator.py",
+            "language": "python",
+            "class_names": ["PaymentValidator"],
+            "method_signatures": ["validate_transaction(amount: float, currency: str)"],
+            "related_ids": ["payment-service-tests", "testing-standards"] 
+        }
+    ),
+
+    # --- Node 2: Unit Test Suite (The Verification Index) ---
+    KnowledgeNode(
+        id="payment-service-tests",
+        title="Unit Tests: Payment Validator Coverage",
+        # CONCISE SUMMARY of what the test covers
+        content="Pytest suite covering happy path for supported currencies and assertion of ValueError for non-positive amounts and unsupported currencies.",
+        source_type=SourceType.CODE_REPOSITORY,
+        source_url="local/simulate/payment-service/tests/test_payment_validator.py", # Local/Azure/GitHub Path
+        tags=["testing", "qa", "pytest", "unit-tests"],
+        updated_at=now - timedelta(days=1),
+        metadata={
+            "file_path": "src/demo_project/test_payment_validator.py",
+            "language": "python",
+            "related_ids": ["payment-validator-code"], # Explicit relationship
+            "execution_command": "pytest src/demo_project/test_payment_validator.py -v", # Agent action data
+        }
+    ),
+
+    # --- Node 3: Confluence Document (The Policy Index) ---
+    KnowledgeNode(
+        id="testing-standards",
+        title="QA Engineering Standards: Code Coverage Policy",
+        # CONCISE SUMMARY of the document's key points
+        content="Riverty requires 80% code coverage for all microservices. Payment validation is a critical path requiring 100% branch coverage.",
+        source_type=SourceType.CONFLUENCE,
+        source_url="https://confluence.riverty.com/display/QA/Standards-V2", # Confluence URL
+        tags=["standards", "policy", "compliance", "qa"],
+        updated_at=now - timedelta(days=30),
+        metadata={
+            "space_key": "QA",
+            "document_author": "Jane Doe",
+            "applies_to_ids": ["payment-validator-code"] # Relationship back to the code
+        }
+    ),
+    
+    # --- Node 4: Database Schema (The Structure Index) ---
+    KnowledgeNode(
+        id="payment-db-schema",
+        title="Payment Database Schema: Transactions Table DDL",
+        # CONCISE SUMMARY of the structure
+        content="PostgreSQL DDL for the 'transactions' table, includes columns for amount (DECIMAL), currency (VARCHAR), and status check constraint.",
+        source_type=SourceType.DATABASE,
+        source_url="internal-db/payments/schema/transactions.sql", # Internal DB location
+        tags=["database", "sql", "schema", "postgres"],
+        updated_at=now - timedelta(days=60),
+        metadata={
+            "engine": "PostgreSQL",
+            "primary_table": "transactions",
+            "schema_version": "1.2.0"
+        }
+    )
+]

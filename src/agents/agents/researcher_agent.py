@@ -1,5 +1,8 @@
-from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
-from langchain_huggingface import ChatHuggingFace
+from langchain_core.messages import SystemMessage, AIMessage, ToolMessage,HumanMessage
+from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
+from langchain.tools import tool
+
 from src.config import settings
 from src.agents.llms.hf_llm import HfLLM
 from src.agents.tools.knowledge_api_tool import KnowledgeAPISearchTool as KnowledgeAPITool
@@ -7,7 +10,8 @@ from src.agents.prompts.researcher_prompt import RESEARCHER_SYSTEM_PROMPT as res
 from src.agents.orchestration.states import AgentState
 from src.logging_config import setup_logging
 
-from typing import Literal
+from typing import Literal, List
+from pydantic import BaseModel, Field
 import json
 
 
@@ -26,19 +30,16 @@ class ResearchAgent:
 
         # Initialize LLM
         hf_llm_instance = HfLLM()
-        llm = hf_llm_instance.get_llm()
-        self.researcher_llm = llm.bind_tools([self.knowledge_tool])
+        self.llm = hf_llm_instance.get_llm()
+        self.researcher_llm = self.llm.bind_tools([self.knowledge_tool])
 
-    # Define agent nodes
     def researcher_node(self, state: AgentState) -> AgentState:
-        """Researcher Agent node - queries Knowledge API"""
         logger.info("Researcher Agent processing...")
-
-        # Prepare messages with system prompt
+        
+        # Call LLM with tool
         messages = [SystemMessage(content=researcher_prompt)] + list(state["messages"])
-            
+
         try:
-            # Call LLM with tool
             response = self.researcher_llm.invoke(messages)
             
             # If LLM wants to use tool, execute it
@@ -64,27 +65,31 @@ class ResearchAgent:
                 final_messages = messages + [response, tool_message]
                 final_response = self.researcher_llm.invoke(final_messages)
 
-                return {
-                    "messages": [response, tool_message, final_response],
-                    "search_results": tool_result_dict,
-                    "next_agent": "executor",
-                    "final_response": final_response.content
-                }
-            else:
-                logger.info("SUCCESS: Researcher did NOT use tool, setting next_agent='executor'")
-                return {
-                    "messages": [response],
-                    "search_results": {"status": "no_tool_used"},
-                    "next_agent": "executor",
-                    "final_response": response.content
-                }
+                # check valid json
+                if not self.is_valid_json(final_response.content):
+                    # Retry once
+                    final_response = self.researcher_llm.invoke(final_messages)
+
+                # update the state
+                state["messages"] = [response, tool_message, final_response]
+                state["search_results"] = json.loads(final_response.content)
+
+                logger.info("Researcher Agent completed with tool usage.")
+                # logger.info(f"Final response: {state['messages'][-1].content}")
+                logger.info(f"Final response: {state['search_results']}")   
+
         except Exception as e:
-            logger.error(f"Researcher agent error: {e}", exc_info=True) 
-            error_msg = AIMessage(content=f"Error in research: {str(e)}")
-            logger.warning("FAILURE: Researcher hit exception, setting next_agent='end'")
-            return {
-                "messages": [error_msg],
-                "search_results": {"status": "error", "error": str(e)},
-                "next_agent": "end"
-            }
-        
+            logger.error(f"Researcher Agent failed: {e}") 
+
+        return state
+    
+    def is_valid_json(self, json_string):
+        """
+        Check if a string is valid JSON.
+        """
+        try:
+            json.loads(json_string)
+            return True
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return False
+

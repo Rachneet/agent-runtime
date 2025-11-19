@@ -1,4 +1,4 @@
-from typing import TypedDict, Annotated, Sequence
+from typing import TypedDict, Annotated, Sequence, List, Dict
 from langchain_core.messages import BaseMessage
 from langgraph.graph import add_messages
 
@@ -9,11 +9,13 @@ class AgentState(TypedDict):
     This is how agents communicate and coordinate.
     """
     messages: Annotated[Sequence[BaseMessage], add_messages]
-    next_agent: str
     task_description: str
     
     # Researcher Agent writes these
-    search_results: dict
+    search_results: dict 
+
+    # Extractor Agent
+    extraction_results: dict
     
     # Executor Agent writes these
     execution_results: dict

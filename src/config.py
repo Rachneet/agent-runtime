@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # core
-    MODEL_ID: str = Field("Qwen/Qwen3-Next-80B-A3B-Instruct", description="HuggingFace model id")
+    MODEL_ID: str = Field("moonshotai/Kimi-K2-Instruct", description="HuggingFace model id")
     HUGGINGFACE_API_KEY: Optional[SecretStr] = Field(None, description="HuggingFace API token")
     ENV: str = Field("development", description="one of: development, staging, production")
 

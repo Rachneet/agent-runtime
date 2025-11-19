@@ -13,9 +13,11 @@ from src.knowledge_api.knowledge_api_client import KnowledgeAPIClient
 
 logger = setup_logging(service_name="knowledge_search_tool", log_file="app.log", log_level="INFO")
 
+
+# Input for the tool from the LLM
 class KnowledgeSearchInput(BaseModel):
     query: str = Field(description="Search query for finding relevant documentation, code, or data")
-    sources: Optional[List[Literal["confluence", "code_repository", "database"]]] = Field(
+    sources: List[Literal["confluence", "code_repository", "database"]] = Field(
         default=None,
         description=(
             "Specific sources to search. "
@@ -25,9 +27,38 @@ class KnowledgeSearchInput(BaseModel):
         )
     )
 
+# Output schema
+class KnowledgeSearchResultItem(BaseModel):
+    """Structured data for a single relevant knowledge artifact."""
+    id: str = Field(description="The stable ID of the knowledge node.")
+    title: str = Field(description="The title of the document or file.")
+    source_type: str = Field(description="The source category (e.g., 'code_repository', 'confluence').")
+
+    file_path: Optional[str] = Field(description="The relative file path or key (e.g., 'src/validator.py', 'QA/Standards').")
+
+    execution_command: Optional[str] = Field(
+        default=None,
+        description="The exact command to run this artifact (e.g., 'pytest path/to/file'). Only present for executable code/tests."
+    )
+
+    # Summary of content for LLM reasoning, not the full content
+    content_summary: str = Field(description="A short summary of the file/document's content for context.")
+
+    # The URL to the external system for deep linking
+    source_url: str = Field(description="The full URL to the original source.")
+
+
+class KnowledgeSearchOutput(BaseModel):
+    """The full structured output of the search tool."""
+    results: List[KnowledgeSearchResultItem] = Field(
+        description="A list of relevant, structured knowledge artifacts found."
+    )
+    message: str = Field(description="A summary message about the search result.")
+
+
 class KnowledgeAPISearchTool(BaseTool):
     name: str = "search_knowledge_api"
-    description: str = "Search Riverty's unified knowledge base for documentation, code, and data."
+    description: str = "Use this tool to search Riverty's unified knowledge base for documentation, code, and data."
     args_schema: type[BaseModel] = KnowledgeSearchInput
     
     api_url: Optional[str] = None
@@ -41,7 +72,6 @@ class KnowledgeAPISearchTool(BaseTool):
         self,
         query: str,
         sources: Optional[List[str]] = None,
-        # FIX 1: Default limit raised to 3 to catch both Test and Source files
         limit: int = 3 
     ) -> Dict[str, Any]:
         
@@ -55,150 +85,46 @@ class KnowledgeAPISearchTool(BaseTool):
         
         return self._extract_structured_data(results)
     
-    def _extract_structured_data(self, results: dict) -> dict:
+    def _extract_structured_data(self, api_results: dict) -> Dict[str, Any]:
         """
-        Iterates through ALL results to find test files and source files.
+        Extracts structured data from the API results, ensuring consistency
+        for LLM consumption.
         """
-        if not results or not results.get('results'):
-            return {"found": False, "test_file": None, "source_files": [], "metadata": {}}
-
-        # Containers for what we find
-        test_file = None
-        source_files = []
-        found_source_paths = set() # To prevent duplicates
+        parsed_results = []
+        raw_results = api_results.get('results', [])
         
-        # Metadata from the primary result (usually the first one)
-        primary_metadata = results['results'][0].get('metadata', {})
-        primary_title = results['results'][0].get('title', '')
+        if not raw_results:
+            return {
+                "results": [],
+                "message": "No relevant artifacts found in the knowledge base."
+            }
 
-        # --- LOOP THROUGH ALL RESULTS ---
-        for kg_result in results['results']:
-            tags = kg_result.get('tags', [])
-            metadata = kg_result.get('metadata', {})
+        for res in raw_results:
+            metadata = res.get('metadata', {})
             
-            # A) Is this a TEST file?
-            if any(t in tags for t in ['test', 'testing', 'pytest']) and not test_file:
-                raw_path = metadata.get('test_file_path', 'test_payment_validator.py')
-                # Ensure path has 'src' if needed
-                if "demo_project" in raw_path and not raw_path.startswith("src/"):
-                    test_path = f"src/{raw_path}"
-                else:
-                    test_path = raw_path
-
-                # 2. FIX: Force the command to use the CORRECTED path
-                # We replace the old path component with the new one
-                raw_command = metadata.get('test_command', f'pytest {test_path} -v')
-                final_command = raw_command.replace("demo_project/", "src/demo_project/")
-
-                test_file = {
-                    "filename": test_path,
-                    "content": metadata.get('file_content', kg_result.get('full_content', '')),
-                    "command": final_command,
-                    "dependencies": metadata.get('dependencies', ['pytest'])
-                }
-                # If this test file mentions a source file, mark it for fallback check
-                if 'source_file_path' in metadata:
-                    primary_metadata['source_file_path'] = metadata['source_file_path']
-
-            # B) Is this a SOURCE file?
-            elif any(t in tags for t in ['code', 'source', 'implementation']):
-                raw_path = metadata.get('file_path', '')
-                if not raw_path and 'source_file_path' in metadata:
-                     raw_path = metadata['source_file_path']
-                
-                if raw_path:
-                    # Ensure path has 'src'
-                    if "demo_project" in raw_path and not raw_path.startswith("src/"):
-                        final_path = f"src/{raw_path}"
-                    else:
-                        final_path = raw_path
-
-                    # Get content
-                    content = metadata.get('full_content', kg_result.get('full_content', ''))
-                    
-                    # Only add if we haven't seen this file yet
-                    if final_path not in found_source_paths and content:
-                        source_files.append({
-                            "filename": final_path,
-                            "content": content,
-                            "path": raw_path
-                        })
-                        found_source_paths.add(final_path)
-
-        # --- SMART FETCH FALLBACK ---
-        # If we found a test file, but NO source files in the top 3 results,
-        # we use the metadata link to go fetch the source explicitly.
-        if test_file and not source_files and 'source_file_path' in primary_metadata:
+            # 1. Get the path, favoring specific paths over generic ones
+            path = metadata.get('file_path') or metadata.get('document_key')
             
-            raw_source_path = primary_metadata['source_file_path']
-            source_filename = raw_source_path.split('/')[-1]
-            
-            logger.info(f"Test found, but source missing from search results. Fetching: {source_filename}")
-            
-            # Fix path for container
-            if "demo_project" in raw_source_path and not raw_source_path.startswith("src/"):
-                final_source_path = f"src/{raw_source_path}"
-            else:
-                final_source_path = raw_source_path
+            # 2. Extract the action command (will be None if not a test/code)
+            command = metadata.get('execution_command')
 
-            # 1. Try Search
-            source_content = ""
-            try:
-                lookup = self._client.search(source_filename, sources=["code_repository"], limit=1)
-                if lookup['results']:
-                    res = lookup['results'][0]
-                    source_content = res.get('metadata', {}).get('full_content', res.get('full_content', ''))
-            except Exception:
-                pass
-
-            # 2. Try Fallback
-            if not source_content:
-                source_content = self._get_fallback_code()
+            # 3. Use the node's main content field as the summary
+            summary = res.get('content', 'No content summary available.')
             
-            source_files.append({
-                "filename": final_source_path,
-                "content": source_content,
-                "path": raw_source_path
-            })
-
+            # Construct the structured item
+            item = KnowledgeSearchResultItem(
+                id=res.get('id', 'N/A'),
+                title=res.get('title', 'Untitled Artifact'),
+                source_type=res.get('source_type', 'unknown'),
+                file_path=path,
+                execution_command=command,
+                content_summary=summary,
+                source_url=res.get('source_url', 'N/A')
+            )
+            parsed_results.append(item.model_dump()) # Use model_dump to get a clean dict
+            
         return {
-            "found": True if (test_file or source_files) else False,
-            "test_file": test_file,
-            "source_files": source_files,
-            "metadata": {"title": primary_title}
+            "results": parsed_results,
+            "message": f"Successfully retrieved {len(parsed_results)} relevant artifacts."
         }
-
-    def _get_fallback_code(self) -> str:
-        """Guaranteed fallback code for PaymentValidator"""
-        return """from decimal import Decimal
-from typing import Any, Dict, Optional
-
-class ValidationError(Exception):
-    pass
-
-class PaymentValidator:
-    def validate_amount(self, amount: Any) -> bool:
-        if amount is None: raise ValidationError("Amount is required")
-        try: val = float(amount)
-        except: raise ValidationError("Invalid amount format")
-        if val < 0.01: raise ValidationError("Amount must be at least 0.01")
-        if val > 999999.99: raise ValidationError("Amount cannot exceed 1,000,000")
-        return True
-
-    def validate_currency(self, currency: Any) -> bool:
-        if not currency: raise ValidationError("Currency is required")
-        if currency not in ["EUR", "USD", "GBP"]: raise ValidationError("Invalid currency")
-        return True
-
-    def validate_payment_method(self, method: Any) -> bool:
-        if not method: raise ValidationError("Payment method is required")
-        if method not in ["credit_card", "debit_card", "bank_transfer", "sepa"]:
-            raise ValidationError("Invalid payment method")
-        return True
-
-    def validate_payment(self, payment: Dict) -> bool:
-        self.validate_amount(payment.get("amount"))
-        self.validate_currency(payment.get("currency"))
-        self.validate_payment_method(payment.get("payment_method"))
-        return True
-"""
+    

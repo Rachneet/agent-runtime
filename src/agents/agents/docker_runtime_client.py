@@ -1,6 +1,7 @@
 import httpx
 from typing import List, Dict, Any
 from src.logging_config import setup_logging
+from src.agents.orchestration.states import AgentState
 
 logger = setup_logging(
     service_name="docker_runtime_client", 
@@ -18,7 +19,7 @@ class DockerRuntimeClient:
         self.base_url = base_url
         self.client = httpx.Client()
 
-    def _run(self, command: str, files: List[Dict[str, str]]) -> Dict[str, Any]:
+    def runtime_node(self, state: AgentState) -> Dict[str, Any]:
         """
         Submits a job to the runtime service.
         
@@ -29,6 +30,20 @@ class DockerRuntimeClient:
         Returns:
             A dictionary with the execution results.
         """
+        files = state["extraction_results"].get("files", [])
+        command = state["extraction_results"].get("command", "")
+        
+        logger.info(f"RUNTIME: Receiving job. Command: '{command}' Files: {len(files)}")
+        
+        # Safety check
+        if not command:
+            return {
+                "execution_results": {
+                    "success": False, 
+                    "error": "No command provided by Task Agent."
+                }
+            }
+
         logger.info(f"Preparing to send {len(files)} files to runtime:")
         for f in files:
             content_len = len(f.get('content', ''))
@@ -56,14 +71,26 @@ class DockerRuntimeClient:
             if result.get('exit_code') == 1:
                 result['success'] = True
                 logger.info("Job finished with Exit Code 1 (Some Tests Failed). Marking as Runtime Success.")
-            # ---------------------------------------------
 
             logger.info(f"Job completed with exit code: {result.get('exit_code')}")
-            return result
+            state["execution_results"] = result
+            return state
             
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP Error from runtime: {e.response.status_code} - {e.response.text}")
-            return {"success": False, "stdout": "", "stderr": e.response.text, "exit_code": -1}
+            state["execution_results"] = {
+                "success": False, 
+                "stdout": "", 
+                "stderr": e.response.text, 
+                "exit_code": -1
+                }
+            return state
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to Docker Runtime Service at {self.base_url}: {e}")
-            return {"success": False, "stdout": "", "stderr": f"Failed to connect to runtime service: {e}", "exit_code": -1}
+            state["execution_results"] = {
+                "success": False, 
+                "stdout": "", 
+                "stderr": f"Failed to connect to runtime service: {e}", 
+                "exit_code": -1
+            }
+            return state

@@ -81,37 +81,12 @@ class KnowledgeAPIClient:
         """Search database schemas and documentation."""
         return self.search(query=query, sources=["database"], limit=limit)
     
-    def get_document(self, document_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific document by ID."""
-        node = self.knowledge_graph.get_by_id(document_id)
-        if node:
-            return self._format_node(node)
-        return None
-
-    def get_by_tags(self, tags: List[str], limit: int = 1) -> Dict[str, Any]:
-        """Get documents by tags."""
-        nodes = self.knowledge_graph.get_by_tags(tags, limit)
-        return {
-            "tags": tags,
-            "total_results": len(nodes),
-            "results": [self._format_node(node) for node in nodes]
-        }
-    
-    def get_recent(self, limit: int = 1) -> Dict[str, Any]:
-        """Get recently updated documents."""
-        nodes = self.knowledge_graph.get_recent(limit)
-        return {
-            "total_results": len(nodes),
-            "results": [self._format_node(node) for node in nodes]
-        }
-    
     def _format_node(self, node: KnowledgeNode) -> Dict[str, Any]:
         """Format a knowledge node for API response."""
         return {
             "id": node.id,
             "title": node.title,
-            "excerpt": self._create_excerpt(node.content),
-            "full_content": node.content,
+            "content": node.content,
             "source": {
                 "type": node.source_type.value,
                 "url": node.source_url
@@ -121,22 +96,6 @@ class KnowledgeAPIClient:
             "metadata": node.metadata
         }
     
-    def _create_excerpt(self, content: str, max_length: int = 200) -> str:
-        """Create an excerpt from content."""
-        if len(content) <= max_length:
-            return content
-        
-        excerpt = content[:max_length]
-        last_period = excerpt.rfind('.')
-        last_newline = excerpt.rfind('\n')
-        
-        break_point = max(last_period, last_newline)
-        if break_point > max_length // 2:
-            excerpt = excerpt[:break_point + 1]
-        
-        return excerpt.strip() + "..."
-
-
 
 # Example usage and testing
 if __name__ == "__main__":
@@ -149,7 +108,11 @@ if __name__ == "__main__":
     
     # Example 1: Search for deployment info
     print("\n1. Searching for 'Test files for payment service'...")
-    results = client.search("Test files for payment service", limit=3)
+    results = client.search(
+        "Run unit tests for payment service and report the results.", 
+        sources=["code_repository"], 
+        limit=3
+    )
     print(f"   Found {results['total_results']} results:")
     for result in results['results']:
         print(f"   - {result['title']} ({result['source']['type']})")
@@ -160,21 +123,6 @@ if __name__ == "__main__":
     print(f"   Found {results['total_results']} results:")
     for result in results['results']:
         print(f"   - {result['title']}")
-    
-    # Example 3: Search by tags
-    print("\n3. Getting documents tagged with 'security'...")
-    results = client.get_by_tags(["security"])
-    print(f"   Found {results['total_results']} results:")
-    for result in results['results']:
-        print(f"   - {result['title']}")
-    
-    # Example 4: Get specific document
-    print("\n4. Getting specific document...")
-    doc = client.get_document("deploy-user-service")
-    if doc:
-        print(f"   Title: {doc['title']}")
-        print(f"   Source: {doc['source']['url']}")
-        print(f"   Excerpt: {doc['excerpt'][:100]}...")
     
     print("\n" + "=" * 70)
     print("Demo complete!")

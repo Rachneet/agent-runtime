@@ -86,8 +86,8 @@ def run_job(job: JobPayload):
         print(f"Generated PYTHONPATH: {python_path}") # For debug visibility
 
         # 4. Define command
-        full_command = f"/bin/sh -c 'pip install pytest && {job.command}'"
-       
+        full_command = f"/bin/sh -c 'pip install pytest flake8 && {job.command}'"
+
         # 5. Run the container
         try:
             container = client.containers.run(
