@@ -115,11 +115,11 @@ class KnowledgeAPISearchTool(BaseTool):
             item = KnowledgeSearchResultItem(
                 id=res.get('id', 'N/A'),
                 title=res.get('title', 'Untitled Artifact'),
-                source_type=res.get('source_type', 'unknown'),
+                source_type=res.get('source', 'unknown')["type"],
                 file_path=path,
                 execution_command=command,
                 content_summary=summary,
-                source_url=res.get('source_url', 'N/A')
+                source_url=res.get('source', 'N/A')["url"]
             )
             parsed_results.append(item.model_dump()) # Use model_dump to get a clean dict
             

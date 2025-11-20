@@ -1,4 +1,7 @@
+import re
 from typing import Dict
+from IPython.display import Image, display
+
 from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
 
@@ -6,11 +9,12 @@ from src.agents.orchestration.states import AgentState
 from src.agents.agents.researcher_agent import ResearchAgent
 from src.agents.agents.reporting_agent import ReportingAgent
 from src.agents.agents.extraction_agent import CodeExtractionAgent
-
 from src.agents.agents.docker_runtime_client import DockerRuntimeClient
-
 from src.logging_config import setup_logging
-import re
+
+from dotenv import load_dotenv
+load_dotenv()
+
 
 logger = setup_logging(
     service_name="workflow",
@@ -52,7 +56,7 @@ class AgentWorkflow:
         workflow.add_node("runtime", self.runtime_client.runtime_node) 
         workflow.add_node("reporter", self.reporter.reporter_node)
 
-        # # Define edges
+        # Define edges
         workflow.set_entry_point("researcher")
         workflow.add_edge("researcher", "extractor")
         
@@ -92,19 +96,17 @@ class AgentWorkflow:
             raise
 
     # Helper method
-    def _extract_code_from_content(self, content: str) -> str:
-        if "**Complete Test File Content:**" in content:
-            parts = content.split("**Complete Test File Content:**")
-            if len(parts) > 1:
-                content = parts[1]
-        
-        match = re.search(r'```(python|bash|)\s*\n(.*?)```', content, re.DOTALL)
-        if match:
-            return match.group(2).strip()
-        return content.strip().replace("```", "")
-    
-    def _clean_command(self, command: str) -> str:
-        return self._extract_code_from_content(command)
+    def save_workflow(self, file_path: str):
+        """
+        Save the agent workflow graph in the specified directory
+        """
+        data = self.compiled_workflow.get_graph().draw_mermaid_png()
+
+        try:
+            with open(file_path, "wb") as f:
+                f.write(data)
+        except Exception as e:
+            print("Unexpected error in saving file: {e}")
 
 
 if __name__ == "__main__":
@@ -114,16 +116,17 @@ if __name__ == "__main__":
     print("\n!!! MAKE SURE THE DOCKER RUNTIME SERVICE IS RUNNING ON PORT 8001 !!!\n")
     
     agent_workflow = AgentWorkflow()
+    # agent_workflow.view_workflow()
     run_agent_workflow = agent_workflow.full_pipeline
     query = "Find test files for the payment service and run them"
     query2 = "Tell me about the CEO of Google."
     query3 = "Find the payment service tests and the source code, and run flake8 on them."
     query4 = "What is the capital of France?"
-    result = run_agent_workflow(query)
+    result = run_agent_workflow(query3)
 
     print("\n" + "=" * 70)
     print("Workflow Complete!")
     print("=" * 70)
-    print(f"\Execution Results: {result.get('execution_results', {})}")
+    print(f"\nExecution Results: {result.get('execution_results', {})}")
     print(f"\nFinal Answer:\n{result.get('final_answer', 'No answer provided.')}")
     
