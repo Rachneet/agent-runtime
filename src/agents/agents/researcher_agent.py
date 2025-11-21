@@ -1,11 +1,10 @@
 import json
 from typing import List, Literal
 
-from langchain.agents import create_agent
-from langchain.agents.structured_output import ToolStrategy
 from langchain.tools import tool
-from langchain_core.messages import (AIMessage, HumanMessage, SystemMessage,
-                                     ToolMessage)
+from langchain_core.messages import SystemMessage
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 
 from src.agents.llms.hf_llm import HfLLM
@@ -20,6 +19,12 @@ from src.logging_config import setup_logging
 logger = setup_logging(
     service_name="researcher_agent", log_file="app.log", log_level="INFO"
 )
+
+class ResponseModel(BaseModel):
+    files: List[str] = Field(
+        description="Path to code files required to accomplish the task."
+    )
+    command: str = Field(description="Exact command to be executed to accomplish the task.")
 
 
 class ResearchAgent:
@@ -37,8 +42,18 @@ class ResearchAgent:
     def researcher_node(self, state: AgentState) -> AgentState:
         logger.info("Researcher Agent processing...")
 
+        input_parser = JsonOutputParser(
+            name="research_output",
+            pydantic_object=ResponseModel
+        )
+        prompt = PromptTemplate(
+            input_variables=[],
+            template=researcher_prompt,
+            partial_variables={"format_instructions": input_parser.get_format_instructions()}
+        )
+        # logger.info(f"Research prompt: {prompt.format()}")
         # Call LLM with tool
-        messages = [SystemMessage(content=researcher_prompt)] + list(state["messages"])
+        messages = [SystemMessage(content=prompt.format())] + list(state["messages"])
 
         try:
             response = self.researcher_llm.invoke(messages)

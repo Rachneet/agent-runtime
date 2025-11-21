@@ -67,15 +67,7 @@ Requirements:
 - If code or scripts are found, provide their exact file paths (along with the paths of related files) and the command to execute them.
 - If no relevant artifacts are found, clearly state that in your response.
 
-Please return your answer in JSON format that strictl;y follows this schema:
+Please return your answer in JSON format that strictly follows this schema:
 
-{
-    "files": ["file_path1", "file_path2", ...],
-    "command": "exact command to execute"
-}
-
-
-- Always output a valid JSON.
-- Do not include extra keys or text outside of JSON.
-- If a field has no value, use an empty list or empty string instead of omitting it.
+{format_instructions}
 """

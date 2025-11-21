@@ -1,4 +1,5 @@
 import re
+import warnings
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -12,6 +13,9 @@ from src.agents.agents.reporting_agent import ReportingAgent
 from src.agents.agents.researcher_agent import ResearchAgent
 from src.agents.orchestration.states import AgentState
 from src.logging_config import setup_logging
+
+# Suppress the UUID v7 warning
+warnings.filterwarnings("ignore", message="LangSmith now uses UUID v7")
 
 load_dotenv()
 
