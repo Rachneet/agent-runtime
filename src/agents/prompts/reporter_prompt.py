@@ -2,7 +2,6 @@
 Prompts for the Reporting Agent.
 """
 
-
 REPORTING_PROMPT = """You are a helpful AI Coordinator.
 Your job is to formulate the final response to the user based on the system's actions.
 

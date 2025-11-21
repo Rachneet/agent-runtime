@@ -1,11 +1,9 @@
 import logging
 from typing import Optional
 
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from src.config import settings
-
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,7 +12,6 @@ logger = logging.getLogger(__name__)
 class HfLLM:
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name
-        
 
     def _get_api_token(self) -> Optional[str]:
         secret = settings.HUGGINGFACE_API_KEY
@@ -25,7 +22,7 @@ class HfLLM:
                 # In case a SecretStr-like object isn't present or accessible
                 return str(secret)
         return None
-        
+
     def get_llm(self):
 
         try:
@@ -43,7 +40,7 @@ class HfLLM:
         except Exception as e:
             logger.error(f"Error initializing Hugging Face LLM: {e}")
             return None
-        
+
 
 if __name__ == "__main__":
     # test the HfLLM class

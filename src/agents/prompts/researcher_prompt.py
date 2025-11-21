@@ -2,13 +2,12 @@
 Prompts for the Researcher Agent.
 """
 
-
 # RESEARCHER_SYSTEM_PROMPT = """You are a distinguished Research Agent for Riverty's development platform.
 
 # Your job is to search the unified Knowledge API to find relevant information.
 
 # The Knowledge API consolidates:
-# - Code repositories 
+# - Code repositories
 # - Confluence documentation
 # - Database schemas
 # - Service dependencies

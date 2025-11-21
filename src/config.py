@@ -1,8 +1,7 @@
 from typing import Optional
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
-from pydantic import ConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,12 +13,20 @@ class Settings(BaseSettings):
     """
 
     # Allow extra keys in the .env file (do not fail on unknown env vars)
-    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = ConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # core
-    MODEL_ID: str = Field("moonshotai/Kimi-K2-Instruct", description="HuggingFace model id")
-    HUGGINGFACE_API_KEY: Optional[SecretStr] = Field(None, description="HuggingFace API token")
-    ENV: str = Field("development", description="one of: development, staging, production")
+    MODEL_ID: str = Field(
+        "moonshotai/Kimi-K2-Instruct", description="HuggingFace model id"
+    )
+    HUGGINGFACE_API_KEY: Optional[SecretStr] = Field(
+        None, description="HuggingFace API token"
+    )
+    ENV: str = Field(
+        "development", description="one of: development, staging, production"
+    )
 
     # runtime / model
     MODEL_TIMEOUT_SECONDS: int = Field(30, description="LLM call timeout")
@@ -28,10 +35,7 @@ class Settings(BaseSettings):
 
     # logging & observability
     LOG_LEVEL: str = Field("INFO")
-    LOG_FILE: str = Field("agent.log")
-
-    # feature toggles
-    ENABLE_STRICT_SCHEMA: bool = Field(True, description="Enforce schema validation on LLM output")
+    LOG_FILE: str = Field("app.log")
 
     @field_validator("ENV")
     def validate_env(cls, v: str) -> str:
@@ -49,4 +53,4 @@ class Settings(BaseSettings):
 
 
 # singleton to import across the app
-settings = Settings()       
+settings = Settings()
