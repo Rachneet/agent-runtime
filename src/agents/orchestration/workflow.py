@@ -116,13 +116,13 @@ if __name__ == "__main__":
     agent_workflow = AgentWorkflow()
     # agent_workflow.view_workflow()
     run_agent_workflow = agent_workflow.full_pipeline
-    query = "Find test files for the payment service and run them"
+    query = "Locate the source code and test files for the payment service. Once identified, execute the specific test suite for those files and report the results."
     query2 = "Tell me about the CEO of Google."
     query3 = (
         "Find the payment service tests and the source code, and run flake8 on them."
     )
     query4 = "What is the capital of France?"
-    result = run_agent_workflow(query3)
+    result = run_agent_workflow(query)
 
     print("\n" + "=" * 70)
     print("Workflow Complete!")
